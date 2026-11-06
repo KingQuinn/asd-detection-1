@@ -156,7 +156,8 @@ ASD DETECTION/
 ├── explore_page.py           # Streamlit: metrics and figures
 ├── predict_page.py           # Streamlit: questionnaire and prediction
 ├── index.html                # React (CDN) web frontend for the Flask API
-├── requirements.txt          # Training + Streamlit dependencies
+├── requirements.txt          # Training + Streamlit dependencies (Streamlit Cloud)
+├── packages.txt              # System packages for Streamlit Cloud
 ├── Autism_Dataset_Combined.csv
 ├── cleaned_dataset.csv       # Written by train.py
 ├── reports/
@@ -268,31 +269,43 @@ versions the model was trained with.
 
 ## Deployment
 
-`asd-backend/` can be deployed on Vercel as-is (`vercel.json` routes every path
-to `app.py`). Add `SUPABASE_URL` and `SUPABASE_KEY` as Vercel environment
-variables. Notes:
+Whichever host you use, the model pickle must be loaded with the **same
+scikit-learn and XGBoost versions** it was trained with (pinned in
+`asd-backend/requirements.txt` and `requirements.txt`). Retrain after any upgrade.
 
-- The model pickle must be loaded with the **same scikit-learn and XGBoost
-  versions** it was trained with (pinned in `asd-backend/requirements.txt`).
-  Retrain after any upgrade.
-- On Linux, `xgboost` wheels are large because they bundle GPU libraries, and
-  the function may exceed Vercel's size limit. The smaller `xgboost-cpu`
-  package only exists for XGBoost 3.0 and later, so switching to it means
-  upgrading and retraining. Hugging Face Spaces (below) has no such limit.
+### Streamlit Community Cloud (recommended, free)
 
-### Hugging Face Spaces (recommended)
+The repository is ready to deploy as-is: `app.py` and `requirements.txt` are at
+the top level, and `packages.txt` installs the OpenMP library XGBoost needs.
 
-`huggingface/` holds a Docker-based Space that runs the Streamlit app. Once
-you are logged in (`hf auth login` with a write token), run:
+1. Sign in at [share.streamlit.io](https://share.streamlit.io) with GitHub.
+2. **Create app** → this repository, branch `main`, main file `app.py`.
+3. Under *Advanced settings*, choose Python **3.12** and paste the secrets:
+   ```toml
+   SUPABASE_URL = "https://<project>.supabase.co"
+   SUPABASE_KEY = "<anon key>"
+   ```
+   Streamlit Cloud exposes these as environment variables, which is how the app
+   reads them. Without them the app still works and simply doesn't save.
 
-```bash
-huggingface/deploy.sh <your-hf-username>/asd-detection
-```
+Free apps sleep after about 12 hours without visitors. The next visitor wakes
+the app with one click, which takes about 30 seconds.
 
-To save predictions, add `SUPABASE_URL` and `SUPABASE_KEY` under the Space's
-*Settings → Variables and secrets*. The Space restarts and starts saving.
-- After deploying, point the frontend at the backend URL (`?api=...`) or change
-  `API_URL` in `index.html`.
+### Flask API (Render, Heroku, Vercel)
+
+- **Render / Heroku:** the `Procfile` runs `gunicorn --chdir asd-backend app:app`.
+- **Vercel:** deploy `asd-backend/` (`vercel.json` routes every path to
+  `app.py`). Linux `xgboost` wheels are large because they bundle GPU
+  libraries, so the function may exceed Vercel's size limit.
+
+Set `SUPABASE_URL` and `SUPABASE_KEY` as environment variables. Then point the
+frontend at the API with `?api=https://...`, or change `API_URL` in `index.html`.
+
+### Hugging Face Spaces (needs PRO)
+
+`huggingface/` holds a Docker-based Space for the Streamlit app. Docker Spaces
+now require a Hugging Face PRO subscription. With one, run
+`huggingface/deploy.sh <username>/asd-detection` after `hf auth login`.
 
 ## Bug fixes in this revision
 
