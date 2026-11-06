@@ -52,14 +52,20 @@ def show_predict_page():
         payload = {**answers, "Age": age, "Sex": sex, "Jaundice": jaundice, "Family_ASD": family_asd}
         label, proba = predict(get_model(), payload)
         db = get_db()
+        save_error = None
         if db is not None:
             try:
                 save_prediction(db, payload, label)
             except Exception as e:
                 # A database outage should not block the screening result.
+                save_error = e
                 print(f"Failed to store prediction in Supabase: {e}")
+        elif os.environ.get("SUPABASE_URL"):
+            save_error = "Supabase client could not start (check SUPABASE_KEY)"
         if label == 1:
             st.warning(f"Prediction: ASD traits detected (probability {proba:.0%})")
         else:
             st.success(f"Prediction: No ASD traits detected (probability {proba:.0%})")
         st.caption("This is a screening aid, not a diagnosis. Please consult a qualified clinician.")
+        if save_error is not None:
+            st.caption(f"Note: this result was not saved ({save_error}).")

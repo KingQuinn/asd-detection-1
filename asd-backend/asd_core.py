@@ -102,7 +102,8 @@ def save_prediction(client, payload, label):
         "Family_ASD": str(payload["Family_ASD"]).lower(),
         "Prediction": "yes" if label == 1 else "no",
     })
-    client.table("predictions").insert(record).execute()
+    # returning="minimal": the table only allows inserts, so the row can't be read back.
+    client.table("predictions").insert(record, returning="minimal").execute()
 
 
 def predict(bundle, payload):
