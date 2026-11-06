@@ -4,7 +4,5 @@ __pycache__/
 .DS_Store
 .ipynb_checkpoints/
 .env
-legacy/*.pkl
-asd_predictions.db
 .claude/
 .vscode/

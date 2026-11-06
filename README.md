@@ -6,6 +6,8 @@ It uses a two-level stacking ensemble: **SVM, k-NN and a Decision Tree** as base
 learners, with an **XGBoost** meta-model on top. The project includes a Flask
 REST API, a React web frontend and a Streamlit app.
 
+**Live app:** https://asd-detection-1-vd6fj3buv9eabjedhengnd.streamlit.app/
+
 > **Disclaimer:** This is an academic project and a screening aid only. It is
 > not a medical diagnosis. Anyone concerned about ASD should consult a qualified
 > clinician.
@@ -163,13 +165,12 @@ ASD DETECTION/
 ├── reports/
 │   ├── metrics.json          # Written by train.py
 │   └── figures/              # Written by train.py
-├── asd-backend/              # Deployable Flask API (Vercel)
+├── asd-backend/              # Flask REST API
 │   ├── app.py
 │   ├── asd_core.py           # Shared feature definitions and inference
 │   ├── asd_detection2.pkl    # Trained model (written by train.py)
-│   ├── requirements.txt
-│   └── vercel.json
-└── legacy/                   # Original exploratory scripts, kept for reference
+│   └── requirements.txt
+└── Procfile                  # Runs the Flask API on Render / Heroku
 ```
 
 `train.csv` and `test.csv` are a separate Kaggle adult dataset. The current
@@ -220,7 +221,7 @@ python -m http.server 8000
 ```
 
 Then open http://127.0.0.1:8000/index.html. To use a deployed backend, add
-`?api=https://your-backend.vercel.app` to the URL.
+`?api=https://your-backend.example.com` to the URL.
 
 ### 3. (Alternative) Run the Streamlit app
 
@@ -291,21 +292,12 @@ the top level, and `packages.txt` installs the OpenMP library XGBoost needs.
 Free apps sleep after about 12 hours without visitors. The next visitor wakes
 the app with one click, which takes about 30 seconds.
 
-### Flask API (Render, Heroku, Vercel)
+### Flask API (Render, Heroku)
 
-- **Render / Heroku:** the `Procfile` runs `gunicorn --chdir asd-backend app:app`.
-- **Vercel:** deploy `asd-backend/` (`vercel.json` routes every path to
-  `app.py`). Linux `xgboost` wheels are large because they bundle GPU
-  libraries, so the function may exceed Vercel's size limit.
+The `Procfile` runs `gunicorn --chdir asd-backend app:app`.
 
 Set `SUPABASE_URL` and `SUPABASE_KEY` as environment variables. Then point the
 frontend at the API with `?api=https://...`, or change `API_URL` in `index.html`.
-
-### Hugging Face Spaces (needs PRO)
-
-`huggingface/` holds a Docker-based Space for the Streamlit app. Docker Spaces
-now require a Hugging Face PRO subscription. With one, run
-`huggingface/deploy.sh <username>/asd-detection` after `hf auth login`.
 
 ## Bug fixes in this revision
 
@@ -314,11 +306,11 @@ now require a Hugging Face PRO subscription. With one, run
 | 1 | The Decision Tree was trained on raw `Age`, but the Flask and Streamlit apps passed it the **standardised** `Age` | Stacked model accuracy in the live apps fell from about 98% to **74.7%**. The Decision Tree alone fell from 95.3% to 71.0% | Scaling now lives inside each model's pipeline, and the whole ensemble is one `StackingClassifier` |
 | 2 | The XGBoost meta-model's hyperparameters were tuned on the 14 raw features, then the model was refit on the 3 stacked probabilities | The tuning did not apply to the meta-model that was actually used | XGBoost is now tuned on the out-of-fold stacked probabilities |
 | 3 | Frontend instructions said "Yes = disagree" for items 2–6 and 9, but the code scored "No" as the trait answer on those items | Users who followed the instructions got the reverse score on 6 of the 10 items | Buttons are now **Agree / Disagree**, with AQ-10 scoring done in code |
-| 4 | `asd-backend/requirements.txt` was a full Anaconda `pip freeze` with local `file:///` paths | `pip install` and Vercel builds failed | Replaced with a minimal pinned list |
+| 4 | `asd-backend/requirements.txt` was a full Anaconda `pip freeze` with local `file:///` paths | `pip install` and cloud builds failed | Replaced with a minimal pinned list |
 | 5 | Supabase URL and key were hard-coded in `app.py`, and any database error crashed `/predict` | Credentials were exposed in git, and a database outage broke predictions | Read from environment variables; logging is optional and its errors are caught |
 | 6 | `/predict` had no input validation | A missing field gave a `KeyError` (HTTP 500) | Validation returns HTTP 400 with a clear message |
 | 7 | The API ran on port 5000 | On macOS, AirPlay Receiver answers on 5000 with HTTP 403, so the frontend could not connect | Default port is now 5001, configurable with `PORT` |
-| 8 | Training logic was copied, with differences, across `asd.py`, `Test.py`, `autism.py` and `explore.py` | Results were hard to reproduce, and the saved model depended on which script ran last | One `train.py`; the old scripts moved to `legacy/` |
+| 8 | Training logic was copied, with differences, across `asd.py`, `Test.py`, `autism.py` and `explore.py` | Results were hard to reproduce, and the saved model depended on which script ran last | One `train.py` replaces them (the old scripts remain in git history) |
 | 9 | Unpinned React CDN builds (`react@18`, development build) | Behaviour could change without notice, and the development build is slower | Pinned to `react@18.3.1` production builds |
 
 > **Security note:** the old Supabase anon key is still in this repository's
