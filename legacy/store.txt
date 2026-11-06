@@ -1,0 +1,341 @@
+# Handle outliers using Z-score
+z_scores = np.abs(zscore(data[numerical_columns]))
+outliers = (z_scores > 3).any(axis=1)
+data = data[~outliers]
+
+
+
+
+# XGBoost
+xgb_params = {
+    'n_estimators': [50, 100, 200],
+    'learning_rate': [0.01, 0.1, 0.2],
+    'max_depth': [3, 5, 7]
+}
+xgb = XGBClassifier(random_state=42)
+xgb_grid = GridSearchCV(xgb, xgb_params, cv=5, scoring='accuracy', n_jobs=-1)
+xgb_grid.fit(X_train, y_train)
+print("Best XGBoost Params:", xgb_grid.best_params_)
+
+('xgboost', xgb_grid.best_estimator_)
+
+
+# Use Random Forest to select important features
+rf = RandomForestClassifier(random_state=42)
+rf.fit(X_processed, y)
+
+# Select features with importance above a threshold
+selector = SelectFromModel(rf, threshold='mean')
+selector.fit(X_processed, y)
+X_selected = selector.transform(X_processed)
+
+# Get the indices of the selected features
+selected_indices = selector.get_support(indices=True)
+
+# Get the names of the selected features
+feature_names = numerical_columns + list(preprocessor.named_transformers_['cat'].get_feature_names_out(categorical_columns))
+selected_features = [feature_names[i] for i in selected_indices]
+
+print(X_selected.shape)  # Expected: (num_samples, num_selected_features)
+print(len(selected_features)) 
+
+
+
+
+# Step 2: BEFS (Bidirectional Feature Selection)
+rf = RandomForestClassifier(random_state=42)
+befs = SequentialFeatureSelector(
+    rf,
+    k_features='best',  # Select the best subset of features
+    forward=True,       # Use forward selection
+    floating=True,      # Allow bidirectional elimination
+    scoring='accuracy', # Use accuracy as the evaluation metric
+    cv=5,              # Use 5-fold cross-validation
+    n_jobs=-1          # Use all available cores
+)
+
+# Fit BEFS
+befs.fit(X_processed, y)
+
+selected_features_befs = list(befs.k_feature_names_)
+print("BEFS Selected Features:", selected_features_befs)
+
+
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X_selected, y_encoded, test_size=0.2, random_state=50)
+
+# Define base models
+base_models = [
+    ('random_forest', RandomForestClassifier(random_state=42, max_depth=5)),  # Limit depth to reduce overfitting
+    ('svm', make_pipeline(StandardScaler(), SVC(kernel='rbf', probability=True, random_state=42))),
+    ('xgboost', XGBClassifier(random_state=42, max_depth=3, early_stopping_rounds=10))  # Early stopping to prevent overfitting
+]
+
+# Train and base models
+base_predictions_train = []
+base_predictions_test = []
+
+for name, model in base_models:
+    model.fit(X_train, y_train)
+    train_preds = model.predict_proba(X_train)[:, 1]  # Use probability for meta-model
+    test_preds = model.predict_proba(X_test)[:, 1]
+    base_predictions_train.append(train_preds)
+    base_predictions_test.append(test_preds)
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler, MinMaxScaler
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import cross_val_predict
+from sklearn.model_selection import train_test_split
+
+
+# Load the dataset
+df = pd.read_csv("Autism_Dataset_Combined.csv")  # Replace with your actual dataset
+
+#  Check for duplicates
+df.drop_duplicates(inplace=True)
+
+# Handle categorical data
+categorical_cols = df.select_dtypes(include=['object']).columns  # Identify categorical columns
+
+# Apply Label Encoding for binary categorical features
+label_encoders = {}
+for col in categorical_cols:
+    if df[col].nunique() == 2:  # Binary categorical features
+        le = LabelEncoder()
+        df[col] = le.fit_transform(df[col])
+        label_encoders[col] = le
+
+# Apply One-Hot Encoding for nominal categorical features (more than two unique values)
+df = pd.get_dummies(df, columns=[col for col in categorical_cols if df[col].nunique() > 2], drop_first=True)
+
+# Handle numerical data
+numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
+
+
+# Remove Outliers using Z-score method
+z_scores = np.abs((df[numerical_cols] - df[numerical_cols].mean()) / df[numerical_cols].std())
+df = df[(z_scores < 3).all(axis=1)]  
+
+# Save the cleaned dataset
+df.to_csv("cleaned_dataset.csv", index=False)
+
+print("Data cleaning complete. Cleaned dataset saved.")
+
+df = pd.read_csv("cleaned_dataset.csv")
+
+# Split features and target
+X = df.drop(columns=["Class"]) # features
+y = df["Class"] # target
+
+#correlation matrix
+#RANDOM FOREST feature importance scores
+
+# Split data (80% training, 20% testing)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+# Display split sizes
+print(f"Training Set: {X_train.shape[0]} samples")
+print(f"Testing Set: {X_test.shape[0]} samples")
+
+
+# Initialize base models
+svm_model = SVC(probability=True, random_state=42)
+knn_model = KNeighborsClassifier(n_neighbors=5)
+dt_model = DecisionTreeClassifier(random_state=42)
+
+# Train models and generate predictions using cross-validation
+svm_pred = cross_val_predict(svm_model, X_train, y_train, cv=5, method="predict_proba")[:, 1]
+knn_pred = cross_val_predict(knn_model, X_train, y_train, cv=5, method="predict_proba")[:, 1]
+dt_pred = cross_val_predict(dt_model, X_train, y_train, cv=5, method="predict_proba")[:, 1]
+
+# Stack predictions as new feature set for meta-model
+stacked_train = pd.DataFrame({'SVM': svm_pred, 'KNN': knn_pred, 'DecisionTree': dt_pred})
+
+# Train the meta-model on the stacked predictions
+meta_model = LogisticRegression()
+meta_model.fit(stacked_train, y_train)
+
+# Train base models on full training data
+svm_model.fit(X_train, y_train)
+knn_model.fit(X_train, y_train)
+dt_model.fit(X_train, y_train)
+
+# Generate test set predictions
+svm_test_pred = svm_model.predict_proba(X_test)[:, 1]
+knn_test_pred = knn_model.predict_proba(X_test)[:, 1]
+dt_test_pred = dt_model.predict_proba(X_test)[:, 1]
+
+# Stack test set predictions
+stacked_test = pd.DataFrame({'SVM': svm_test_pred, 'KNN': knn_test_pred, 'DecisionTree': dt_test_pred})
+
+# Make final predictions with meta-model
+final_predictions = meta_model.predict(stacked_test)
+
+# Evaluate performance
+accuracy = accuracy_score(y_test, final_predictions)
+print(f"Stacking Model Accuracy: {accuracy:.4f}")
+print("\nClassification Report:\n", classification_report(y_test, final_predictions))
+
+
+
+
+
+
+
+
+
+
+
+####################################
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler, MinMaxScaler
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from xgboost import XGBClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import cross_val_predict
+from sklearn.model_selection import train_test_split
+
+
+# Load the dataset
+df = pd.read_csv("Autism_Dataset_Combined.csv")  # Replace with your actual dataset
+
+#  Check for duplicates
+df.drop_duplicates(inplace=True)
+
+# Handle categorical data
+categorical_cols = df.select_dtypes(include=['object']).columns  # Identify categorical columns
+
+# Apply Label Encoding for binary categorical features
+label_encoders = {}
+for col in categorical_cols:
+    if df[col].nunique() == 2:  # Binary categorical features
+        le = LabelEncoder()
+        df[col] = le.fit_transform(df[col])
+        label_encoders[col] = le
+
+# Apply One-Hot Encoding for nominal categorical features (more than two unique values)
+df = pd.get_dummies(df, columns=[col for col in categorical_cols if df[col].nunique() > 2], drop_first=True)
+
+# Handle numerical data
+numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
+
+
+# Remove Outliers using Z-score method
+z_scores = np.abs((df[numerical_cols] - df[numerical_cols].mean()) / df[numerical_cols].std())
+df = df[(z_scores < 3).all(axis=1)]  
+
+# Save the cleaned dataset
+df.to_csv("cleaned_dataset.csv", index=False)
+
+print("Data cleaning complete. Cleaned dataset saved.")
+
+df = pd.read_csv("cleaned_dataset.csv")
+
+# Split features and target
+X = df.drop(columns=["Class"]) # features
+y = df["Class"] # target
+
+#correlation matrix
+#RANDOM FOREST feature importance scores
+
+# Split data (80% training, 20% testing)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+# Display split sizes
+print(f"Training Set: {X_train.shape[0]} samples")
+print(f"Testing Set: {X_test.shape[0]} samples")
+
+
+# Define hyperparameter grids
+param_grid_svm = {'C': [0.1, 1, 10], 'kernel': ['linear', 'rbf']}
+param_grid_knn = {'n_neighbors': [3, 5, 7, 9]}
+param_grid_dt = {'max_depth': [3, 5, 10], 'min_samples_split': [2, 5, 10]}
+
+# Perform grid search for each model
+svm_grid = GridSearchCV(SVC(probability=True, random_state=42), param_grid_svm, cv=5, scoring='accuracy')
+knn_grid = GridSearchCV(KNeighborsClassifier(), param_grid_knn, cv=5, scoring='accuracy')
+dt_grid = GridSearchCV(DecisionTreeClassifier(random_state=42), param_grid_dt, cv=5, scoring='accuracy')
+
+# Train grid search models
+svm_grid.fit(X_train, y_train)
+knn_grid.fit(X_train, y_train)
+dt_grid.fit(X_train, y_train)
+
+# Get best estimators
+best_svm = svm_grid.best_estimator_
+best_knn = knn_grid.best_estimator_
+best_dt = dt_grid.best_estimator_
+
+# Train optimized base models
+best_svm.fit(X_train, y_train)
+best_knn.fit(X_train, y_train)
+best_dt.fit(X_train, y_train)
+
+# Generate cross-validated predictions for stacking
+svm_pred = cross_val_predict(best_svm, X_train, y_train, cv=5, method="predict_proba")[:, 1]
+knn_pred = cross_val_predict(best_knn, X_train, y_train, cv=5, method="predict_proba")[:, 1]
+dt_pred = cross_val_predict(best_dt, X_train, y_train, cv=5, method="predict_proba")[:, 1]
+
+# Stack predictions for meta-model
+stacked_train = pd.DataFrame({'SVM': svm_pred, 'KNN': knn_pred, 'DecisionTree': dt_pred})
+
+# Train meta-model (Logistic Regression)
+meta_model = LogisticRegression()
+meta_model.fit(stacked_train, y_train)
+
+# Generate test set predictions
+svm_test_proba = best_svm.predict_proba(X_test)[:, 1]
+knn_test_proba = best_knn.predict_proba(X_test)[:, 1]
+dt_test_proba = best_dt.predict_proba(X_test)[:, 1]
+
+# Stack test set predictions
+stacked_test = pd.DataFrame({'SVM': svm_test_proba, 'KNN': knn_test_proba, 'DecisionTree': dt_test_proba})
+
+# Make final predictions with meta-model
+stacked_predictions = meta_model.predict(stacked_test)
+
+
+
+# Train XGBoost as the meta-model
+meta_model_xgb = XGBClassifier(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=42)
+meta_model_xgb.fit(stacked_train, y_train)
+
+# Make predictions using XGBoost meta-model
+stacked_predictions_xgb = meta_model_xgb.predict(stacked_test)
+
+
+# Evaluate models
+# Accuracy comparison
+print("SVM Accuracy:", accuracy_score(y_test, best_svm.predict(X_test)))
+print("k-NN Accuracy:", accuracy_score(y_test, best_knn.predict(X_test)))
+print("Decision Tree Accuracy:", accuracy_score(y_test, best_dt.predict(X_test)))
+print("Stacking Model Accuracy:", accuracy_score(y_test, stacked_predictions)) 
+
+# Evaluate performance of stacking model and XGBoost meta-model
+print("XGBoost Meta-Model Performance:\n", classification_report(y_test, stacked_predictions_xgb))
+print("XGBoost Stacking Model Accuracy:", accuracy_score(y_test, stacked_predictions_xgb))

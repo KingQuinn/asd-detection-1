@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASD Prediction App</title>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/babel-standalone@6.26.0/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+<div id="app"></div>
+<script type="text/babel">
+    // Backend URL. Override with ?api=https://your-backend.example.com
+    const API_URL = new URLSearchParams(window.location.search).get('api') || 'http://127.0.0.1:5001';
+
+    const HomePage = ({ setPage }) => {
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-200 flex flex-col items-center justify-center p-6">
+        <nav className="w-full max-w-4xl mb-8">
+            <select
+            className="p-2 rounded-lg bg-white shadow-md"
+            value="home"
+            onChange={(e) => setPage(e.target.value)}
+            >
+            <option value="home">Home</option>
+            <option value="test">Test</option>
+            </select>
+        </nav>
+        <main className="w-full max-w-4xl bg-white rounded-xl shadow-lg p-8 text-center">
+            <h1 className="text-4xl font-bold text-gray-800 mb-4">ASD Prediction System</h1>
+            <p className="text-gray-600 mb-6">This app uses an ensemble learning model to predict if a person has Autism Spectrum Disorder (ASD).</p>
+            <button 
+            onClick={() => setPage('test')} 
+            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition duration-300"
+            >
+            Take the Test
+            </button>
+        </main>
+        </div>
+    );
+    };
+
+    const TestPage = ({ setPage }) => {
+    const [formData, setFormData] = React.useState({
+        A1: null, A2: null, A3: null, A4: null, A5: null,
+        A6: null, A7: null, A8: null, A9: null, A10: null,
+        Age: '', Sex: null, Jaundice: null, Family_ASD: null
+    });
+    const [result, setResult] = React.useState(null);
+
+    const questions = [
+        { id: 'A1', text: 'I often notice small sounds when others do not', agreeScore: 1 },
+        { id: 'A2', text: 'I usually concentrate more on the whole picture, rather than the small details', agreeScore: 0 },
+        { id: 'A3', text: 'I find it easy to do more than one thing at once', agreeScore: 0 },
+        { id: 'A4', text: 'If there is an interruption, I can switch back to what I was doing very quickly', agreeScore: 0 },
+        { id: 'A5', text: 'I find it easy to ‘read between the lines’ when someone is talking to me', agreeScore: 0 },
+        { id: 'A6', text: 'I know how to tell if someone listening to me is getting bored', agreeScore: 0 },
+        { id: 'A7', text: 'When I’m reading a story, I find it difficult to work out the characters’ intentions', agreeScore: 1 },
+        { id: 'A8', text: 'I like to collect information about categories of things', agreeScore: 1 },
+        { id: 'A9', text: 'I find it easy to work out what someone is thinking or feeling just by looking at their face', agreeScore: 0 },
+        { id: 'A10', text: 'I find it difficult to work out people’s intentions', agreeScore: 1 },
+    ];
+
+    const handleChange = (key, value) => {
+        setFormData(prev => ({ ...prev, [key]: value }));
+    };
+
+const handleSubmit = async () => {
+        const data = {
+        // AQ-10 scoring: 1 point when the answer matches the item's agreeScore
+        ...Object.fromEntries(questions.map(q => [
+            q.id, (formData[q.id] === 'agree') === (q.agreeScore === 1) ? 1 : 0
+        ])),
+        Age: parseInt(formData.Age, 10),
+        Sex: formData.Sex,
+        Jaundice: formData.Jaundice,
+        Family_ASD: formData.Family_ASD
+        };
+
+        try {
+          const response = await fetch(`${API_URL}/predict`, {
+            method: 'POST',
+            headers: {
+            'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        });
+        const resultData = await response.json();
+        if (!response.ok) {
+            throw new Error(resultData.error || `HTTP error! Status: ${response.status}`);
+        }
+        setResult(`${resultData.result} (probability ${(resultData.probability * 100).toFixed(0)}%)`);
+        } catch (error) {
+        console.error('Error fetching prediction:', error);
+        setResult("Error occurred. Please try again.");
+        }
+    };
+
+    const age = parseInt(formData.Age, 10);
+    const allQuestionsAnswered = Object.values(formData).every(
+        val => val !== null && val !== ''
+    ) && age >= 1 && age <= 100;
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-200 flex flex-col items-center justify-center p-6">
+        <nav className="w-full max-w-4xl mb-8">
+            <select
+            className="p-2 rounded-lg bg-white shadow-md"
+            value="test"
+            onChange={(e) => setPage(e.target.value)}
+            >
+            <option value="test">Test</option>
+            <option value="home">Home</option>
+            </select>
+        </nav>
+        <main className="w-full max-w-4xl bg-white rounded-xl shadow-lg p-8">
+            <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">ASD Screening Test</h2>
+            {result ? (
+            <div className="text-center">
+                <h3 className="text-2xl font-semibold text-gray-700 mb-4">Result: {result}</h3>
+                <p className="text-gray-500 mb-4">This is a screening aid, not a diagnosis. Please consult a qualified clinician.</p>
+                <button 
+                onClick={() => { setResult(null); setFormData({
+                    A1: null, A2: null, A3: null, A4: null, A5: null,
+                    A6: null, A7: null, A8: null, A9: null, A10: null,
+                    Age: '', Sex: null, Jaundice: null, Family_ASD: null
+                }); }} 
+                className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition duration-300"
+                >
+                Retake Test
+                </button>
+            </div>
+            ) : (
+            <div>
+                <p className="text-gray-600 mb-4">Choose Agree if you definitely or slightly agree with the statement, otherwise choose Disagree.</p>
+                {questions.map(q => (
+                <div key={q.id} className="mb-4">
+                    <p className="text-gray-700 mb-2">{q.id}. {q.text}</p>
+                    <div className="flex justify-center space-x-4">
+                    <button 
+                        onClick={() => handleChange(q.id, "agree")}
+                        className={`px-4 py-2 rounded-lg ${formData[q.id] === "agree" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
+                    >
+                        Agree
+                    </button>
+                    <button 
+                        onClick={() => handleChange(q.id, "disagree")}
+                        className={`px-4 py-2 rounded-lg ${formData[q.id] === "disagree" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
+                    >
+                        Disagree
+                    </button>
+                    </div>
+                </div>
+                ))}
+                <div className="mb-4">
+                <p className="text-gray-700 mb-2">What is your age?</p>
+                <input
+                    type="number"
+                    value={formData.Age}
+                    onChange={(e) => handleChange('Age', e.target.value)}
+                    className="p-2 rounded-lg border border-gray-300 w-32 mx-auto block"
+                    min="1"
+                    max="100"
+                    placeholder="Enter age"
+                />
+                </div>
+                <div className="mb-4">
+                <p className="text-gray-700 mb-2">What is your sex?</p>
+                <div className="flex justify-center space-x-4">
+                    <button 
+                    onClick={() => handleChange('Sex', 'm')}
+                    className={`px-4 py-2 rounded-lg ${formData.Sex === 'm' ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
+                    >
+                    Male
+                    </button>
+                    <button 
+                    onClick={() => handleChange('Sex', 'f')}
+                    className={`px-4 py-2 rounded-lg ${formData.Sex === 'f' ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
+                    >
+                    Female
+                    </button>
+                </div>
+                </div>
+                <div className="mb-4">
+                <p className="text-gray-700 mb-2">Do you have a history of jaundice?</p>
+                <div className="flex justify-center space-x-4">
+                    <button 
+                    onClick={() => handleChange('Jaundice', 'yes')}
+                    className={`px-4 py-2 rounded-lg ${formData.Jaundice === 'yes' ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
+                    >
+                    Yes
+                    </button>
+                    <button 
+                    onClick={() => handleChange('Jaundice', 'no')}
+                    className={`px-4 py-2 rounded-lg ${formData.Jaundice === 'no' ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
+                    >
+                    No
+                    </button>
+                </div>
+                </div>
+                <div className="mb-4">
+                <p className="text-gray-700 mb-2">Does your family have a history of ASD?</p>
+                <div className="flex justify-center space-x-4">
+                    <button 
+                    onClick={() => handleChange('Family_ASD', 'yes')}
+                    className={`px-4 py-2 rounded-lg ${formData.Family_ASD === 'yes' ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
+                    >
+                    Yes
+                    </button>
+                    <button 
+                    onClick={() => handleChange('Family_ASD', 'no')}
+                    className={`px-4 py-2 rounded-lg ${formData.Family_ASD === 'no' ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
+                    >
+                    No
+                    </button>
+                </div>
+                </div>
+                <div className="text-center mt-6">
+                <button 
+                    onClick={handleSubmit}
+                    disabled={!allQuestionsAnswered}
+                    className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition duration-300 disabled:bg-gray-400"
+                >
+                    Predict
+                </button>
+                </div>
+            </div>
+            )}
+        </main>
+        </div>
+    );
+    };
+
+    const App = () => {
+    const [page, setPage] = React.useState('home');
+
+    return (
+        <div>
+        {page === 'home' && <HomePage setPage={setPage} />}
+        {page === 'test' && <TestPage setPage={setPage} />}
+        </div>
+    );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('app'));
+    root.render(<App />);
+</script>
+</body>
+</html>

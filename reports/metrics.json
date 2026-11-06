@@ -1,0 +1,102 @@
+{
+  "dataset": {
+    "rows_after_cleaning": 5211,
+    "train": 4168,
+    "test": 1043,
+    "asd_rate": 0.29514488581846093
+  },
+  "best_params": {
+    "SVM": {
+      "clf__C": 10,
+      "clf__kernel": "rbf"
+    },
+    "k-NN": {
+      "clf__n_neighbors": 9
+    },
+    "Decision Tree": {
+      "max_depth": 10,
+      "min_samples_split": 2
+    },
+    "XGBoost meta": {
+      "gamma": 0,
+      "learning_rate": 0.01,
+      "max_depth": 3,
+      "n_estimators": 200,
+      "subsample": 0.7
+    }
+  },
+  "test_metrics": {
+    "SVM": {
+      "accuracy": 0.9856184084372004,
+      "precision": 0.9834983498349835,
+      "recall": 0.9675324675324676,
+      "f1": 0.9754500818330606,
+      "roc_auc": 0.9984274229172186,
+      "confusion_matrix": [
+        [
+          730,
+          5
+        ],
+        [
+          10,
+          298
+        ]
+      ],
+      "train_accuracy": 0.9954414587332053
+    },
+    "k-NN": {
+      "accuracy": 0.9280920421860019,
+      "precision": 0.841642228739003,
+      "recall": 0.9318181818181818,
+      "f1": 0.884437596302003,
+      "roc_auc": 0.982759077657037,
+      "confusion_matrix": [
+        [
+          681,
+          54
+        ],
+        [
+          21,
+          287
+        ]
+      ],
+      "train_accuracy": 0.9524952015355086
+    },
+    "Decision Tree": {
+      "accuracy": 0.9539789069990412,
+      "precision": 0.8987730061349694,
+      "recall": 0.9512987012987013,
+      "f1": 0.9242902208201893,
+      "roc_auc": 0.9677422917218835,
+      "confusion_matrix": [
+        [
+          702,
+          33
+        ],
+        [
+          15,
+          293
+        ]
+      ],
+      "train_accuracy": 0.9904030710172744
+    },
+    "XGBoost Stacking": {
+      "accuracy": 0.9894534995206136,
+      "precision": 0.9805825242718447,
+      "recall": 0.9837662337662337,
+      "f1": 0.9821717990275527,
+      "roc_auc": 0.999238006891068,
+      "confusion_matrix": [
+        [
+          729,
+          6
+        ],
+        [
+          5,
+          303
+        ]
+      ],
+      "train_accuracy": 0.9990403071017274
+    }
+  }
+}
