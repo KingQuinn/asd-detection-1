@@ -8,7 +8,7 @@ REST API, a React web frontend and a Streamlit app.
 
 **Live apps:**
 - Streamlit: https://asd-detection-1-vd6fj3buv9eabjedhengnd.streamlit.app/
-- React + Flask: *Vercel URL to be added once deployed*
+- React + Flask: *Vercel URL to be added once redeployed*
 
 Screening results are stored only when the user ticks the consent box
 ("stored anonymously … used for research"). Without consent, nothing is saved.
