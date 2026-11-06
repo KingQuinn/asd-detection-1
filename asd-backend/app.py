@@ -6,8 +6,8 @@ from flask_cors import CORS
 
 from asd_core import InputError, get_supabase, load_model, predict, save_prediction
 
-# The React frontend (index.html) lives in the project root, one level up.
-FRONTEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# The React frontend. On Vercel, files in public/ are also served directly.
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
 
 app = Flask(__name__)
 CORS(app)

@@ -8,7 +8,7 @@ REST API, a React web frontend and a Streamlit app.
 
 **Live apps:**
 - Streamlit: https://asd-detection-1-vd6fj3buv9eabjedhengnd.streamlit.app/
-- React + Flask: *Render URL to be added once deployed*
+- React + Flask: *Vercel URL to be added once deployed*
 
 Screening results are stored only when the user ticks the consent box
 ("stored anonymously … used for research"). Without consent, nothing is saved.
@@ -63,7 +63,7 @@ Run `python train.py` to reproduce these numbers. It writes them to
 ![System architecture](reports/figures/architecture.png)
 
 ```
- Browser (index.html, React)  ──POST /predict──►  Flask API (asd-backend/app.py)
+ Browser (React page)         ──POST /predict──►  Flask API (asd-backend/app.py)
  Streamlit app (app.py)       ──in-process────►  asd_core.predict()
                                                      │
                                                      ▼
@@ -162,7 +162,6 @@ ASD DETECTION/
 ├── app.py                    # Streamlit entry point (Home + Predict pages)
 ├── explore_page.py           # Streamlit: metrics and figures
 ├── predict_page.py           # Streamlit: questionnaire and prediction
-├── index.html                # React (CDN) web frontend for the Flask API
 ├── requirements.txt          # Training + Streamlit dependencies (Streamlit Cloud)
 ├── packages.txt              # System packages for Streamlit Cloud
 ├── Autism_Dataset_Combined.csv
@@ -174,8 +173,10 @@ ASD DETECTION/
 │   ├── app.py
 │   ├── asd_core.py           # Shared feature definitions and inference
 │   ├── asd_detection2.pkl    # Trained model (written by train.py)
-│   └── requirements.txt
-├── render.yaml               # Render free hosting for React + Flask
+│   ├── public/index.html     # React (CDN) web frontend
+│   ├── requirements.txt
+│   └── .python-version       # Python 3.12 for Vercel
+├── render.yaml               # Render hosting for React + Flask
 └── Procfile                  # Runs the Flask API on Heroku-style hosts
 ```
 
@@ -269,7 +270,7 @@ Invalid or missing fields return HTTP 400 with `{"error": "..."}`.
 
 ### `GET /`
 
-Serves the React frontend (`index.html`).
+Serves the React frontend (`asd-backend/public/index.html`).
 
 ### `GET /health`
 
@@ -300,21 +301,31 @@ the top level, and `packages.txt` installs the OpenMP library XGBoost needs.
 Free apps sleep after about 12 hours without visitors. The next visitor wakes
 the app with one click, which takes about 30 seconds.
 
-### React + Flask on Render (free)
+### React + Flask on Vercel (free, no card needed)
 
-`render.yaml` sets up one free web service that runs the Flask API and serves
-the React page.
+Vercel runs the Flask API as a Python function and serves the React page from
+`asd-backend/public/`.
 
-1. Sign in at [render.com](https://render.com) with GitHub.
-2. **New → Blueprint**, pick this repository, and click **Apply**.
-3. When asked, enter `SUPABASE_URL` and `SUPABASE_KEY`.
+1. Sign in at [vercel.com](https://vercel.com) with GitHub (Hobby plan).
+2. **Add New → Project**, import this repository.
+3. Set **Root Directory** to `asd-backend`. This matters: the top-level `app.py`
+   is the Streamlit app, which Vercel cannot run.
+4. Under **Environment Variables**, add `SUPABASE_URL` and `SUPABASE_KEY`, then
+   **Deploy**.
 
-The first build takes about 5 minutes. Free services sleep after 15 minutes
-without visitors, and the next visit takes up to a minute to load, so open the
-link a minute before a demo. `render.yaml` pins Python 3.12, because the
-numpy version the model needs has no Python 3.13 build.
+Notes:
+- Python functions on Vercel are limited to 500 MB. `asd-backend/requirements.txt`
+  pins the 5 MB CPU-only XGBoost build on Linux; pip would otherwise choose the
+  332 MB GPU build. The whole install is about 300 MB.
+- `.python-version` selects Python 3.12, which the pinned numpy needs.
+- After a quiet spell, the first prediction can take several seconds while
+  the function starts and loads the model; later ones are fast.
 
-The `Procfile` runs the same command for Heroku-style hosts.
+### Render or Heroku
+
+`render.yaml` (Render Blueprint) and the `Procfile` (Heroku) run
+`gunicorn --chdir asd-backend app:app`. Render now asks for a card, even on
+the free plan.
 
 ## Bug fixes in this revision
 

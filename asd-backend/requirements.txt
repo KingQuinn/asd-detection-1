@@ -3,6 +3,9 @@ flask-cors==5.0.1
 numpy==1.26.4
 pandas==2.2.2
 scikit-learn==1.5.1
-xgboost==2.1.4
+# On Linux, use the 5 MB CPU-only XGBoost build. pip would otherwise pick the
+# 332 MB GPU build, which breaks Vercel's 500 MB function size limit.
+xgboost==2.1.4; sys_platform != "linux"
+xgboost @ https://files.pythonhosted.org/packages/f8/6a/41956f91ab984f2fa44529b2551d825a20d33807eba051a60d06ede2a87c/xgboost-2.1.4-py3-none-manylinux2014_x86_64.whl ; sys_platform == "linux"
 supabase==2.34.0
 gunicorn==23.0.0
