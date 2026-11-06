@@ -4,7 +4,7 @@ import sys
 import streamlit as st
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "asd-backend"))
-from asd_core import get_supabase, load_model, predict, save_prediction  # noqa: E402
+from asd_core import CONSENT_TEXT, get_supabase, load_model, predict, save_prediction  # noqa: E402
 
 # AQ-10 items. A point is scored for "agree" on items 1, 7, 8, 10 and for
 # "disagree" on items 2, 3, 4, 5, 6, 9.
@@ -46,12 +46,14 @@ def show_predict_page():
         sex = st.selectbox("Sex", ["m", "f"], format_func={"m": "Male", "f": "Female"}.get)
         jaundice = st.selectbox("Born with jaundice?", ["no", "yes"])
         family_asd = st.selectbox("Family history of ASD?", ["no", "yes"])
+        consent = st.checkbox(CONSENT_TEXT, value=False)
+        st.caption("You get your result either way. Without consent, nothing is stored.")
         ok = st.form_submit_button("Predict")
 
     if ok:
         payload = {**answers, "Age": age, "Sex": sex, "Jaundice": jaundice, "Family_ASD": family_asd}
         label, proba = predict(get_model(), payload)
-        db = get_db()
+        db = get_db() if consent else None
         save_error = None
         if db is not None:
             try:
@@ -60,7 +62,7 @@ def show_predict_page():
                 # A database outage should not block the screening result.
                 save_error = e
                 print(f"Failed to store prediction in Supabase: {e}")
-        elif os.environ.get("SUPABASE_URL"):
+        elif consent and os.environ.get("SUPABASE_URL"):
             save_error = "Supabase client could not start (check SUPABASE_KEY)"
         if label == 1:
             st.warning(f"Prediction: ASD traits detected (probability {proba:.0%})")

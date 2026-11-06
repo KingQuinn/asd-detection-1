@@ -12,8 +12,10 @@
 <body>
 <div id="app"></div>
 <script type="text/babel">
-    // Backend URL. Override with ?api=https://your-backend.example.com
-    const API_URL = new URLSearchParams(window.location.search).get('api') || 'http://127.0.0.1:5001';
+    // Backend URL. Served by Flask, the page talks to its own server; opened as a
+    // local file, it uses the local API. Override with ?api=https://your-backend.example.com
+    const API_URL = new URLSearchParams(window.location.search).get('api')
+        || (window.location.protocol === 'file:' ? 'http://127.0.0.1:5001' : '');
 
     const HomePage = ({ setPage }) => {
     return (
@@ -49,6 +51,7 @@
         Age: '', Sex: null, Jaundice: null, Family_ASD: null
     });
     const [result, setResult] = React.useState(null);
+    const [consent, setConsent] = React.useState(false);
 
     const questions = [
         { id: 'A1', text: 'I often notice small sounds when others do not', agreeScore: 1 },
@@ -76,7 +79,8 @@ const handleSubmit = async () => {
         Age: parseInt(formData.Age, 10),
         Sex: formData.Sex,
         Jaundice: formData.Jaundice,
-        Family_ASD: formData.Family_ASD
+        Family_ASD: formData.Family_ASD,
+        consent
         };
 
         try {
@@ -122,7 +126,7 @@ const handleSubmit = async () => {
                 <h3 className="text-2xl font-semibold text-gray-700 mb-4">Result: {result}</h3>
                 <p className="text-gray-500 mb-4">This is a screening aid, not a diagnosis. Please consult a qualified clinician.</p>
                 <button 
-                onClick={() => { setResult(null); setFormData({
+                onClick={() => { setResult(null); setConsent(false); setFormData({
                     A1: null, A2: null, A3: null, A4: null, A5: null,
                     A6: null, A7: null, A8: null, A9: null, A10: null,
                     Age: '', Sex: null, Jaundice: null, Family_ASD: null
@@ -217,8 +221,20 @@ const handleSubmit = async () => {
                     </button>
                 </div>
                 </div>
+                <label className="flex items-start gap-2 mt-6 text-gray-700">
+                <input
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    className="mt-1"
+                />
+                <span>
+                    I agree that my answers and result may be stored anonymously (no name or contact details) and used for research on ASD screening.
+                    <span className="block text-sm text-gray-500">You get your result either way. Without consent, nothing is stored.</span>
+                </span>
+                </label>
                 <div className="text-center mt-6">
-                <button 
+                <button
                     onClick={handleSubmit}
                     disabled={!allQuestionsAnswered}
                     className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition duration-300 disabled:bg-gray-400"

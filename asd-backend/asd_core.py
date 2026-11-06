@@ -19,7 +19,12 @@ ENCODINGS = {
     "Family_ASD": {"no": 0, "yes": 1},
 }
 
-DEFAULT_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "asd_detection2.pkl")
+CONSENT_TEXT = (
+    "I agree that my answers and result may be stored anonymously (no name or "
+    "contact details) and used for research on ASD screening."
+)
+
+DEFAULT_MODEL_PATH =os.path.join(os.path.dirname(os.path.abspath(__file__)), "asd_detection2.pkl")
 
 
 class InputError(ValueError):

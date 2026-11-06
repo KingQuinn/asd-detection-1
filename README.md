@@ -6,7 +6,12 @@ It uses a two-level stacking ensemble: **SVM, k-NN and a Decision Tree** as base
 learners, with an **XGBoost** meta-model on top. The project includes a Flask
 REST API, a React web frontend and a Streamlit app.
 
-**Live app:** https://asd-detection-1-vd6fj3buv9eabjedhengnd.streamlit.app/
+**Live apps:**
+- Streamlit: https://asd-detection-1-vd6fj3buv9eabjedhengnd.streamlit.app/
+- React + Flask: *Render URL to be added once deployed*
+
+Screening results are stored only when the user ticks the consent box
+("stored anonymously … used for research"). Without consent, nothing is saved.
 
 > **Disclaimer:** This is an academic project and a screening aid only. It is
 > not a medical diagnosis. Anyone concerned about ASD should consult a qualified
@@ -170,7 +175,8 @@ ASD DETECTION/
 │   ├── asd_core.py           # Shared feature definitions and inference
 │   ├── asd_detection2.pkl    # Trained model (written by train.py)
 │   └── requirements.txt
-└── Procfile                  # Runs the Flask API on Render / Heroku
+├── render.yaml               # Render free hosting for React + Flask
+└── Procfile                  # Runs the Flask API on Heroku-style hosts
 ```
 
 `train.csv` and `test.csv` are a separate Kaggle adult dataset. The current
@@ -210,18 +216,12 @@ python train.py
 cd asd-backend && python app.py
 ```
 
-The API starts on **http://127.0.0.1:5001**. It uses port 5001 because macOS's
-AirPlay Receiver already occupies port 5000. Set a different port with
-`PORT=8080 python app.py` if needed.
+Open **http://127.0.0.1:5001**. Flask serves both the React page and the API.
+It uses port 5001 because macOS's AirPlay Receiver already occupies port 5000.
+Set a different port with `PORT=8080 python app.py` if needed.
 
-In a second terminal, serve the frontend:
-
-```bash
-python -m http.server 8000
-```
-
-Then open http://127.0.0.1:8000/index.html. To use a deployed backend, add
-`?api=https://your-backend.example.com` to the URL.
+To point the page at a different backend, add `?api=https://your-backend.example.com`
+to the URL.
 
 ### 3. (Alternative) Run the Streamlit app
 
@@ -238,7 +238,8 @@ Create a `predictions` table with columns `A1`…`A10` (int), `Age` (int),
 export SUPABASE_URL="https://<project>.supabase.co" SUPABASE_KEY="<anon key>"
 ```
 
-Without these variables the API still works and simply skips saving.
+Without these variables the apps still work and simply skip saving. With
+them, a result is saved only when the user ticks the consent box.
 
 ## API reference
 
@@ -251,17 +252,24 @@ that indicates the trait):
 {
   "A1": 1, "A2": 1, "A3": 0, "A4": 1, "A5": 1,
   "A6": 1, "A7": 1, "A8": 0, "A9": 1, "A10": 1,
-  "Age": 25, "Sex": "m", "Jaundice": "no", "Family_ASD": "yes"
+  "Age": 25, "Sex": "m", "Jaundice": "no", "Family_ASD": "yes",
+  "consent": true
 }
 ```
+
+`consent` is optional. The record is stored in Supabase only when it is `true`.
 
 Response:
 
 ```json
-{ "result": "ASD Positive", "probability": 0.904 }
+{ "result": "ASD Positive", "probability": 0.904, "saved": true }
 ```
 
 Invalid or missing fields return HTTP 400 with `{"error": "..."}`.
+
+### `GET /`
+
+Serves the React frontend (`index.html`).
 
 ### `GET /health`
 
@@ -292,12 +300,21 @@ the top level, and `packages.txt` installs the OpenMP library XGBoost needs.
 Free apps sleep after about 12 hours without visitors. The next visitor wakes
 the app with one click, which takes about 30 seconds.
 
-### Flask API (Render, Heroku)
+### React + Flask on Render (free)
 
-The `Procfile` runs `gunicorn --chdir asd-backend app:app`.
+`render.yaml` sets up one free web service that runs the Flask API and serves
+the React page.
 
-Set `SUPABASE_URL` and `SUPABASE_KEY` as environment variables. Then point the
-frontend at the API with `?api=https://...`, or change `API_URL` in `index.html`.
+1. Sign in at [render.com](https://render.com) with GitHub.
+2. **New → Blueprint**, pick this repository, and click **Apply**.
+3. When asked, enter `SUPABASE_URL` and `SUPABASE_KEY`.
+
+The first build takes about 5 minutes. Free services sleep after 15 minutes
+without visitors, and the next visit takes up to a minute to load, so open the
+link a minute before a demo. `render.yaml` pins Python 3.12, because the
+numpy version the model needs has no Python 3.13 build.
+
+The `Procfile` runs the same command for Heroku-style hosts.
 
 ## Bug fixes in this revision
 

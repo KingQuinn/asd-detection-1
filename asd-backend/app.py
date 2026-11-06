@@ -1,10 +1,13 @@
 import logging
 import os
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 from asd_core import InputError, get_supabase, load_model, predict, save_prediction
+
+# The React frontend (index.html) lives in the project root, one level up.
+FRONTEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 app = Flask(__name__)
 CORS(app)
@@ -19,7 +22,7 @@ supabase = get_supabase()
 
 @app.route('/', methods=['GET'])
 def index():
-    return jsonify({"message": "Welcome to the ASD Detection APP!"})
+    return send_from_directory(FRONTEND_DIR, "index.html")
 
 
 @app.route('/health', methods=['GET'])
@@ -39,14 +42,17 @@ def predict_route():
 
     result = "ASD Positive" if label == 1 else "ASD Negative"
 
-    if supabase is not None:
+    # Store only when the user ticked the consent box.
+    saved = False
+    if supabase is not None and data.get("consent") is True:
         try:
             save_prediction(supabase, data, label)
+            saved = True
         except Exception:
             # A database outage should not block the screening result.
             log.exception("Failed to store prediction in Supabase")
 
-    return jsonify({"result": result, "probability": round(proba, 4)})
+    return jsonify({"result": result, "probability": round(proba, 4), "saved": saved})
 
 
 if __name__ == '__main__':

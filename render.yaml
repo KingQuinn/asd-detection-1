@@ -1,0 +1,19 @@
+# Render Blueprint: Flask API + React frontend as one free web service.
+# In Render: New → Blueprint → pick this repository.
+services:
+  - type: web
+    name: asd-detection
+    runtime: python
+    plan: free
+    buildCommand: pip install -r asd-backend/requirements.txt
+    startCommand: gunicorn --chdir asd-backend --bind 0.0.0.0:$PORT app:app
+    healthCheckPath: /health
+    envVars:
+      # numpy 1.26 (needed to load the trained model) has no Python 3.13 wheels.
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      # Prompted for during setup; leave blank to run without saving.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
